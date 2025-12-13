@@ -1,0 +1,17 @@
+{
+  "technologies": ["TypeScript", "svelte", "Three.js", " node"],
+  "lang": {
+    "en": {
+      "name": "NN3D",
+      "desc": "An interactive 3D neural-network visualization component for Svelte, designed to represent hierarchical AI structures with smooth navigation and user interaction."
+    },
+    "es": {
+      "name": "NN3D",
+      "desc": "Un componente interactivo de visualización 3D de redes neuronales para Svelte, diseñado para representar estructuras jerárquicas de IA con navegación fluida e interacción del usuario."
+    },
+    "zh": {
+      "name": "NN3D",
+      "desc": "一个用于 Svelte 的交互式 3D 神经网络可视化组件，旨在以流畅的导航和用户交互方式表示分层 AI 结构。"
+    }
+  }
+}
