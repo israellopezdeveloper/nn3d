@@ -35,7 +35,7 @@ jobs:
       run: pnpm build
 
     - name: Pack (sanity check)
-      run: npm prepack
+      run: pnpm prepack
 
     - name: Publish
       env:
