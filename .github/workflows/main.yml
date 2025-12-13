@@ -2,8 +2,8 @@ name: CI Main Branch
 
 on:
   push:
-    branches:
-      - main
+    tags:
+      - "v*.*.*"
 
 jobs:
   create-images:
@@ -16,6 +16,30 @@ jobs:
         submodules: true
         fetch-depth: 0
         recursive: true
-    - name: TBD
-      run: |
-        echo "WIP"
+          
+    - name: Setup Node (latest LTS)
+      uses: actions/setup-node@v4
+      with:
+        node-version: "lts/*"
+        registry-url: "https://registry.npmjs.org"
+        cache: "pnpm"
+
+    - name: Setup pnpm
+      uses: pnpm/action-setup@v4
+      with:
+        version: latest
+        run_install: false
+
+    - name: Install dependencies
+      run: pnpm install
+
+    - name: Build
+      run: pnpm build
+
+    - name: Pack (sanity check)
+      run: npm prepack
+
+    - name: Publish
+      env:
+        NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+      run: npm publish --access public
