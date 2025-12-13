@@ -1,0 +1,5 @@
+onlyBuiltDependencies:
+  - esbuild
+
+overrides:
+  nn3d: link:../../../../.local/share/pnpm/global/5/node_modules/@israellopez/nn3d
