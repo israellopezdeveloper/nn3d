@@ -38,6 +38,7 @@ export class Panel extends THREE.Mesh {
     this._baseColor = baseColor;
     this.castShadow = false;
     this.receiveShadow = false;
+    this.visible = false;
   }
 
   /** Hace que el panel "brille" del color base (hover ON) */
@@ -53,11 +54,16 @@ export class Panel extends THREE.Mesh {
     const mat = this.material as THREE.MeshStandardMaterial;
     mat.opacity = this._offOpacity;
     mat.emissiveIntensity = 0.0;
+    this.visible = false;
+    this.castShadow = false;
+    this.receiveShadow = false;
   }
 
   /** Mostrar el panel (sigue respetando opacity/hover) */
   public show(): void {
     this.visible = true;
+    this.castShadow = false;
+    this.receiveShadow = false;
   }
 
   /** Ocultar el panel por completo */

@@ -38,20 +38,20 @@ export type LayerInfo = {
 export type NeuronNode = {
   id: string;
   label: string;
-  type: "project" | "course" | "education" | "language";
+  type: string;
 };
 
 export type LayerNode = {
   id: string;
   label: string;
-  type: "projects" | "complementary" | "university" | "languages";
+  type: string;
   neurons: NeuronNode[];
 };
 
 export type ModelNode = {
-  id: "jobs" | "education";
-  label: string; // 'jobs', 'education'
-  layers?: LayerNode[]; // para education
+  id: string;
+  label: string;
+  layers?: LayerNode[];
 };
 
 export type NN3DInterface = {

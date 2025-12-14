@@ -184,15 +184,7 @@ export class InteractionManager {
         });
     }
 
-    const tiltByMode: Record<CameraMode, number> = {
-      overview: 0,
-      modelFocus: 30,
-      layerFocus: 50,
-      neuronFocus: 60,
-    };
-
     this._mode = mode;
-    this._rig.setTilt(tiltByMode[mode]);
     if (mode === "overview") {
       if (this._focusedModel) showPanel(this._focusedModel, mode);
       this._focusedModel = null;
@@ -248,7 +240,7 @@ export class InteractionManager {
       if (modelId) {
         this._layers.forEach((l) => l.hide());
         this.setMode("modelFocus", clicked as Panel);
-        this._rig.focusOnObject(clicked);
+        this._rig.focusOnObject(clicked, "modelFocus");
       }
       return;
     }
@@ -266,7 +258,7 @@ export class InteractionManager {
       if (info) {
         this._layers.forEach((l) => l.hide());
         this.setMode("layerFocus", clicked as Panel);
-        this._rig.focusOnObject(clicked);
+        this._rig.focusOnObject(clicked, "layerFocus");
       }
       return;
     }
@@ -276,7 +268,7 @@ export class InteractionManager {
       if (modelId) {
         this._layers.forEach((l) => l.hide());
         this.setMode("neuronFocus", clicked as Neuron);
-        this._rig.focusOnObject(clicked);
+        this._rig.focusOnObject(clicked, "neuronFocus");
       }
       return;
     }

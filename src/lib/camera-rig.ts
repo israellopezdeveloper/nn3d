@@ -1,5 +1,6 @@
-import * as THREE from 'three';
-import gsap from 'gsap';
+import * as THREE from "three";
+import gsap from "gsap";
+import type { CameraMode } from "./types.ts";
 
 export class CameraRig {
   public camera: THREE.OrthographicCamera;
@@ -23,17 +24,17 @@ export class CameraRig {
   public focusOverview(object?: THREE.Object3D) {
     if (object) {
       const box = new THREE.Box3().setFromObject(object);
-      this.zoomToBox(box);
+      this.zoomToBox(box, "overview");
       return;
     }
 
     const box = new THREE.Box3().setFromObject(this.rootGroup);
-    this.zoomToBox(box);
+    this.zoomToBox(box, "overview");
   }
 
-  public focusOnObject(object: THREE.Object3D) {
+  public focusOnObject(object: THREE.Object3D, mode: CameraMode) {
     const box = new THREE.Box3().setFromObject(object);
-    this.zoomToBox(box);
+    this.zoomToBox(box, mode);
   }
 
   public update(_deltaSeconds: number) {
@@ -41,7 +42,7 @@ export class CameraRig {
     this.camera.lookAt(this.targetLookAt);
   }
 
-  public zoomToBox(box: THREE.Box3) {
+  private zoomToBox(box: THREE.Box3, mode: CameraMode) {
     const center = new THREE.Vector3();
     box.getCenter(center);
 
@@ -60,13 +61,28 @@ export class CameraRig {
 
     const newZoom = Math.min(zoomX, zoomY) * this.ZOOM_PERCENTAGE;
 
+    // this.setTilt(box, mode);
+
     // Animar posición X/Y de la cámara hacia el centro de la caja
     gsap.to(this.camera.position, {
       x: center.x,
       y: center.y,
       duration: this.MOVE_DURATION,
-      ease: 'power1.inOut',
-      overwrite: 'auto'
+      ease: "power1.inOut",
+      overwrite: "auto",
+      onUpdate: () => this.camera.lookAt(center),
+    });
+
+    // Animar zoom de la cámara
+    gsap.to(this.camera, {
+      zoom: newZoom,
+      duration: this.ZOOM_DURATION,
+      ease: "power3.inOut",
+      overwrite: "auto",
+      onUpdate: () => {
+        this.camera.updateProjectionMatrix();
+        this.camera.lookAt(center);
+      },
     });
 
     // Animar también el punto al que mira (lookAt) para evitar saltos bruscos
@@ -75,31 +91,33 @@ export class CameraRig {
       y: center.y,
       z: center.z,
       duration: this.MOVE_DURATION,
-      ease: 'power1.inOut',
-      overwrite: 'auto'
-    });
-
-    // Animar zoom de la cámara
-    gsap.to(this.camera, {
-      zoom: newZoom,
-      duration: this.ZOOM_DURATION,
-      ease: 'power3.inOut',
-      overwrite: 'auto',
-      onUpdate: () => {
-        this.camera.updateProjectionMatrix();
-      }
+      ease: "power1.inOut",
+      overwrite: "auto",
     });
   }
 
-  public setTilt(deg: number) {
-    const targetRad = THREE.MathUtils.degToRad(deg);
+  private setTilt(target: THREE.Box3 | null, mode: CameraMode) {
+    const tiltByMode: Record<CameraMode, number> = {
+      overview: 0,
+      modelFocus: 30,
+      layerFocus: 50,
+      neuronFocus: 60,
+    };
+    const targetRad = THREE.MathUtils.degToRad(tiltByMode[mode]);
 
     // Animamos la rotación en X del rootGroup para simular el tilt
     gsap.to(this.rootGroup.rotation, {
       x: targetRad,
       duration: this.TILT_DURATION,
-      ease: 'power1.inOut',
-      overwrite: 'auto'
+      ease: "power1.inOut",
+      overwrite: "auto",
+      onUpdate: () => {
+        if (target) {
+          const center = new THREE.Vector3();
+          target.getCenter(center);
+          this.camera.lookAt(center);
+        }
+      },
     });
   }
 }

@@ -24,7 +24,7 @@ export class Neuron extends THREE.Group {
       metalness: 0.85,
       roughness: 0.15,
       transparent: true,
-      opacity: 0.9,
+      opacity: 0.7,
       clearcoat: 1,
       clearcoatRoughness: 0.1,
       emissive: neuronOutColor,
@@ -32,6 +32,7 @@ export class Neuron extends THREE.Group {
     });
 
     this.core = new THREE.Mesh(coreGeo, coreMat);
+    this.core.position.set(0, 0, 0);
     this.add(this.core);
 
     // -------------------------------
@@ -48,6 +49,7 @@ export class Neuron extends THREE.Group {
     });
 
     this.fogSphere = new THREE.Mesh(fogGeo, fogMat);
+    this.fogSphere.position.set(0, 0, 0);
     this.add(this.fogSphere);
 
     // -------------------------------
@@ -61,11 +63,11 @@ export class Neuron extends THREE.Group {
       metalness: 0.8,
       roughness: 0.3,
       transparent: true,
-      opacity: 0.3,
+      opacity: 0.9,
     });
 
     this.inner = new THREE.Mesh(innerGeo, innerMat);
-    this.inner.position.set(-0.2, -0.1, -0.15);
+    this.inner.position.set(0, 0, 0);
     this.add(this.inner);
   }
 
@@ -77,9 +79,9 @@ export class Neuron extends THREE.Group {
     const t = timeMs * 0.001; // a segundos
 
     // Movimiento núcleo interno (órbita suave)
-    this.inner.position.x = -0.15 * Math.cos(t * 3.3);
-    this.inner.position.y = -0.15 * Math.sin(t * 3.0);
-    this.inner.position.z = -0.15 * Math.sin(t * 3.6);
+    this.inner.position.x = 0.3 * Math.sin(t * 1.5);
+    this.inner.position.y = 0.3 * Math.sin(t * 2.5);
+    this.inner.position.z = 0.3 * Math.sin(t * 3.5);
 
     // Opacidad de la neblina: un poco más fuerte en hover
     const fogMat = this.fogSphere.material as THREE.MeshBasicMaterial;
