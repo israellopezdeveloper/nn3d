@@ -6,7 +6,7 @@ on:
       - "v*.*.*"
 
 jobs:
-  create-images:
+  publish-npm:
     name: Generate and push images
     runs-on: ubuntu-latest
     steps:
