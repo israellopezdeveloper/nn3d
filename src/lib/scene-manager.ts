@@ -4,7 +4,8 @@ import { PanelFactory, type PanelResult } from "./panel-factory.ts";
 import { InteractionManager } from "./interaction-manager.ts";
 import type { ModelNode, NN3DInterface } from "./types.ts";
 import type { Neuron } from "./neuron.ts";
-import type { Panel } from "./panel.ts";
+import type { Model } from "./model.ts";
+import type { Layer } from "./layer.ts";
 
 export class SceneManager {
   private _container: HTMLElement;
@@ -13,7 +14,6 @@ export class SceneManager {
   private readonly _handleResizeBound: () => void;
 
   private _scene: THREE.Scene;
-  private _camera: THREE.OrthographicCamera;
   private _renderer: THREE.WebGLRenderer;
   private _rig: CameraRig;
 
@@ -21,8 +21,8 @@ export class SceneManager {
   private _panelResults: PanelResult[] = [];
   private _panelWidths: number[] = [];
 
-  private _models: Panel[] = [];
-  private _layers: Panel[] = [];
+  private _models: Model[] = [];
+  private _layers: Layer[] = [];
   private _neurons: Neuron[] = [];
 
   private _animationId: number = 0;
@@ -37,17 +37,6 @@ export class SceneManager {
     // 1. Setup básico
     this._scene = new THREE.Scene();
     const rect = container.getBoundingClientRect();
-    const aspect = rect.width / rect.height;
-    const frustumSize = 10;
-    this._camera = new THREE.OrthographicCamera(
-      (-frustumSize * aspect) / 2,
-      (frustumSize * aspect) / 2,
-      frustumSize / 2,
-      -frustumSize / 2,
-      0.1,
-      1000,
-    );
-    this._camera.position.set(0, 0, 10);
 
     this._renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
     this._renderer.setSize(container.clientWidth, container.clientHeight);
@@ -58,20 +47,32 @@ export class SceneManager {
 
     // Grupo raíz que contiene todos los paneles
     this._rootGroup = new THREE.Group();
+    this._rootGroup.visible = false;
+    this._rootGroup.castShadow = false;
+    this._rootGroup.receiveShadow = false;
     this._scene.add(this._rootGroup);
 
     this.buildModels(this._config.models);
-    this._createBackground(this._config.background);
+    if (this._config.background) {
+      this._createBackground(this._config.background);
+    }
     if (this._backgroundMesh) this._scene.add(this._backgroundMesh);
 
     // Una vez construidos todos, los distribuimos en horizontal
     this.layoutPanelsHorizontally(10); // gap fijo entre paneles (ajusta a gusto)
-    this._rig = new CameraRig(this._camera, this._rootGroup);
+
+    // Cámara/rígido: todo lo relacionado con cámara vive aquí
+    this._rig = new CameraRig({
+      rootGroup: this._rootGroup,
+      viewportWidth: rect.width,
+      viewportHeight: rect.height,
+      frustumSize: 10,
+      initialPosition: { x: 0, y: 0, z: 10 },
+    });
     this._rig.focusOverview(this._rootGroup);
 
     // InteractionManager se encarga de hover/click + raycaster
     this._interaction = new InteractionManager({
-      camera: this._camera,
       rig: this._rig,
       element: this._renderer.domElement,
       models: this._models,
@@ -88,20 +89,20 @@ export class SceneManager {
     this.onResize();
     window.addEventListener("resize", this._handleResizeBound);
 
+    // Mostrar root cuando ya está todo listo (si quieres mantenerlo oculto por diseño, quita esto)
+    this._rootGroup.visible = true;
+
     // 4. Empezar loop
     this.animate();
   }
 
   /**
    * Crea un plano de fondo en el mundo, detrás de todos los paneles,
-   * usando una textura. El fondo se mueve con el rootGroup, no con la cámara.
+   * con la textura indicada.
    */
-  private _createBackground(background?: string) {
-    if (!this._rootGroup) return;
-    if (!background) return;
-
-    // Calculamos el bounding box del contenido para dimensionar el fondo
+  private _createBackground(background: string) {
     const box = new THREE.Box3().setFromObject(this._rootGroup);
+
     const size = new THREE.Vector3();
     const center = new THREE.Vector3();
     box.getSize(size);
@@ -112,102 +113,73 @@ export class SceneManager {
     const height = (size.y || 10) * 10;
 
     const textureLoader = new THREE.TextureLoader();
-    const texture = textureLoader.load(background); // ajusta la ruta
+    const texture = textureLoader.load(background);
 
-    // Si tu versión de THREE lo soporta:
     texture.colorSpace = THREE.SRGBColorSpace;
     texture.wrapS = THREE.RepeatWrapping;
     texture.wrapT = THREE.RepeatWrapping;
-    texture.repeat.set(20, 20);
-    const geometry = new THREE.PlaneGeometry(width, height);
-    const material = new THREE.MeshBasicMaterial({
+    texture.repeat.set(1, 1);
+
+    const geo = new THREE.PlaneGeometry(width, height);
+    const mat = new THREE.MeshBasicMaterial({
       map: texture,
-      depthWrite: false, // no escribe en z-buffer, pero sí hace depthTest por defecto
+      transparent: true,
+      opacity: 0.9,
+      depthWrite: false,
     });
 
-    const mesh = new THREE.Mesh(geometry, material);
-
-    // Lo centramos respecto al contenido y lo mandamos "al fondo"
+    const mesh = new THREE.Mesh(geo, mat);
     mesh.position.set(center.x, center.y, -20);
-    mesh.renderOrder = -10; // se dibuja antes que el resto
 
     this._backgroundMesh = mesh;
-
-    // 👇 Importante: fondo pegado al mundo, no a la cámara
-    this._rootGroup.add(mesh);
   }
 
   private setupLights() {
-    const ambient = new THREE.AmbientLight(0x404040, 0.1);
-    this._scene.add(ambient);
-
-    const dirLight = new THREE.DirectionalLight(0xffffff, 2);
+    const dirLight = new THREE.DirectionalLight(0xffffff, 1.0);
     dirLight.position.set(3, 5, 8);
     this._scene.add(dirLight);
+
+    const ambLight = new THREE.AmbientLight(0xffffff, 0.5);
+    this._scene.add(ambLight);
   }
 
   private buildModels(models: ModelNode[]) {
-    const factory = new PanelFactory();
-
-    this._panelResults = [];
-    this._panelWidths = [];
+    const panelFactory = new PanelFactory();
 
     models.forEach((model, i) => {
-      const { group, layers, neurons }: PanelResult = factory.createNN(
+      const panelResult: PanelResult = panelFactory.createNN(
         model,
         i,
         models.length,
-        true,
+        false,
         this._config,
       );
+      this._panelResults.push(panelResult);
 
-      // En vez de añadir directamente a la escena, lo añadimos al rootGroup
-      this._rootGroup.add(group);
+      this._models.push(panelResult.model);
+      this._layers.push(...panelResult.layers);
+      this._neurons.push(...panelResult.neurons);
 
-      // Guardamos el PanelResult para luego recolocarlo
-      this._panelResults.push({ group, layers, neurons });
+      this._rootGroup.add(panelResult.group);
 
-      // Calculamos el ancho real del panel
-      const box = new THREE.Box3().setFromObject(group);
+      const box = new THREE.Box3().setFromObject(panelResult.group);
       const size = new THREE.Vector3();
       box.getSize(size);
-      this._panelWidths.push(size.x);
-
-      const panel: Panel = group.getObjectByName("panel") as Panel;
-      if (panel) {
-        this._models.push(panel);
-      }
-      this._layers = this._layers.concat(layers);
-
-      if (model.layers && neurons.length) {
-        let offset = 0;
-        model.layers.forEach((layer) => {
-          layer.neurons.forEach((_, neuronIndex) => {
-            const mesh = neurons[offset + neuronIndex];
-            if (!mesh) return;
-            this._neurons.push(mesh);
-          });
-          offset += layer.neurons.length;
-        });
-      }
+      this._panelWidths.push(size.x || 10);
     });
   }
 
-  // Distribuye los paneles en horizontal con una separación fija entre bounding boxes
   private layoutPanelsHorizontally(gap: number) {
-    if (!this._panelResults.length) return;
-
     const totalWidth =
       this._panelWidths.reduce((acc, w) => acc + w, 0) +
-      gap * (this._panelWidths.length - 1);
+      gap * (this._panelResults.length - 1);
 
     let cursorX = -totalWidth / 2;
 
-    this._panelResults.forEach((panelResult, index) => {
-      const w = this._panelWidths[index];
+    this._panelResults.forEach((panelResult, i) => {
+      const w = this._panelWidths[i];
       const centerX = cursorX + w / 2;
 
-      // Sobrescribimos cualquier posición X que viniera de createNN
       panelResult.group.position.x = centerX;
 
       cursorX += w + gap;
@@ -216,32 +188,28 @@ export class SceneManager {
 
   private onResize() {
     const rect = this._container.getBoundingClientRect();
-    const aspect = rect.width / rect.height;
-    const frustumSize = 10;
 
-    const ortho = this._camera as THREE.OrthographicCamera;
-
-    ortho.left = (-frustumSize * aspect) / 2;
-    ortho.right = (frustumSize * aspect) / 2;
-    ortho.top = frustumSize / 2;
-    ortho.bottom = -frustumSize / 2;
-    ortho.updateProjectionMatrix();
-
+    this._rig.resize(rect.width, rect.height);
     this._renderer.setSize(rect.width, rect.height);
-    const model: THREE.Mesh = this._interaction.getFocusedModel() as THREE.Mesh;
+
+    // Re-enfocar (mantener el estado actual)
+    const focused =
+      this._interaction.getFocusedModel() as unknown as THREE.Object3D | null;
+
     if (this._interaction.getCurrentMode() === "overview") {
       this._rig.focusOverview();
-    } else if (model) {
-      this._rig.focusOnObject(model);
+    } else if (focused) {
+      this._rig.focusOnObject(focused, this._interaction.getCurrentMode());
     }
   }
 
   private animate = () => {
     this._animationId = requestAnimationFrame(this.animate);
-    const t: number = performance.now();
-    this._neurons.forEach((n) => n.update(t));
-    this._rig.update(t);
-    this._renderer.render(this._scene, this._camera);
+
+    // La animación de neuronas ya vive dentro de cada Neuron (GSAP),
+    // así que aquí solo actualizamos el rig y renderizamos.
+    this._rig.update(performance.now());
+    this._renderer.render(this._scene, this._rig.camera);
   };
 
   public dispose() {
@@ -249,6 +217,12 @@ export class SceneManager {
 
     window.removeEventListener("resize", this._handleResizeBound);
     this._interaction.dispose();
+
+    // MUY IMPORTANTE si Neuron usa GSAP:
+    // mata timelines/tweens propios para evitar memory leaks.
+    for (const n of this._neurons) {
+      (n as unknown as { dispose?: () => void }).dispose?.();
+    }
 
     this._renderer.dispose();
 
@@ -261,6 +235,12 @@ export class SceneManager {
         mesh.material.dispose();
       }
     });
+
+    if (this._backgroundMesh) {
+      this._backgroundMesh.geometry.dispose();
+      (this._backgroundMesh.material as THREE.Material).dispose();
+      this._backgroundMesh = null;
+    }
   }
 
   public goto(
@@ -273,31 +253,59 @@ export class SceneManager {
       this._rig.focusOverview();
       return;
     }
+
     if (!layer) {
-      const panel: Panel = this._models.filter(
+      const panel: Panel | undefined = this._models.find(
         (p) => p.parent?.name === model,
-      )[0];
+      );
+      if (!panel) return;
+
       this._interaction.setMode("modelFocus", panel);
-      this._rig.focusOnObject(panel);
+      this._rig.focusOnObject(panel, "modelFocus");
       return;
     }
+
     if (!neuron) {
-      const panel: Panel = this._layers.filter(
+      const panel: Panel | undefined = this._layers.find(
         (p) => p.parent?.name === layer,
-      )[0];
+      );
+      if (!panel) return;
+
       this._interaction.setMode("layerFocus", panel);
-      this._rig.focusOnObject(panel);
+      this._rig.focusOnObject(panel, "layerFocus");
       return;
     }
-    if (model && layer && neuron) {
-      const mesh: Neuron = this._neurons.filter(
-        (n) =>
-          n.userData.modelId === model &&
-          n.userData.layerId === layer &&
-          n.userData.neuronId === neuron,
-      )[0];
-      this._interaction.setMode("neuronFocus", mesh);
-      this._rig.focusOnObject(mesh);
-    }
+
+    // Neuron focus
+    const found: Neuron | undefined = this._neurons.find((n) => {
+      // Soporte userData antiguo:
+      const ud: any = (n as any).userData;
+
+      const oldOk =
+        ud?.modelId === model &&
+        ud?.layerId === layer &&
+        ud?.neuronId === neuron;
+
+      // Soporte userData nuevo (Neuron guarda node):
+      // - node.id == neuron
+      // - layer/model pueden venir en campos extra o vía parent names
+      const nodeOk = ud?.node?.id === neuron;
+
+      const parentLayerOk = n.parent?.name === layer || ud?.layerId === layer;
+      const parentModelOk =
+        n.parent?.parent?.name === model || ud?.modelId === model;
+
+      const newOk = nodeOk && parentLayerOk && parentModelOk;
+
+      return oldOk || newOk;
+    });
+
+    if (!found) return;
+
+    this._interaction.setMode(
+      "neuronFocus",
+      found as unknown as THREE.Object3D,
+    );
+    this._rig.focusOnObject(found as unknown as THREE.Object3D, "neuronFocus");
   }
 }

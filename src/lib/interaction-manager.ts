@@ -9,117 +9,108 @@ import type {
   ModelInfo,
   NeuronInfo,
 } from "./types.ts";
+import type { Model } from "./model.ts";
+import type { Layer } from "./layer.ts";
 
 export class InteractionManager {
-  private _camera: THREE.OrthographicCamera;
-  private _rig: CameraRig;
-  private _element: HTMLElement;
+  private rig: CameraRig;
+  private element: HTMLElement;
 
-  private _raycaster = new THREE.Raycaster();
-  private _mouse = new THREE.Vector2();
+  private raycaster = new THREE.Raycaster();
+  private mouse = new THREE.Vector2();
 
-  private _models: Panel[];
-  private _layers: Panel[];
-  private _neurons: Neuron[];
+  private models: Model[];
+  private layers: Layer[];
+  private neurons: Neuron[];
 
-  private _onNothingSelect: () => void;
-  private _onModelSelect: (info: ModelInfo) => void;
-  private _onLayerSelect: (info: LayerInfo) => void;
-  private _onNeuronSelect: (info: NeuronInfo) => void;
+  private onNothingSelect: () => void;
+  private onModelSelect: (info: ModelInfo) => void;
+  private onLayerSelect: (info: LayerInfo) => void;
+  private onNeuronSelect: (info: NeuronInfo) => void;
 
-  private _mode: CameraMode = "overview";
-  private _focusedModel: Panel | null = null;
-  private _focusedNeuron: Neuron | null = null;
+  private mode: CameraMode = "overview";
+  private focusedModel: Model | null = null;
+  private focusedLayer: Layer | null = null;
+  private focusedNeuron: Neuron | null = null;
 
-  private _hoveredPanel: Panel | null = null;
+  private hovered: Model | Layer | Neuron | null = null;
 
-  private readonly _handlePointerMoveBound: (e: PointerEvent) => void;
-  private readonly _handlePointerDownBound: (e: PointerEvent) => void;
+  private readonly handlePointerMoveBound: (e: PointerEvent) => void;
+  private readonly handlePointerDownBound: (e: PointerEvent) => void;
 
   constructor(config: InteractionConfig) {
-    this._camera = config.camera;
-    this._rig = config.rig;
-    this._element = config.element;
+    // Nota: config.camera puede existir por el type, pero la fuente real es rig.camera
+    this.rig = config.rig;
+    this.element = config.element;
 
-    this._models = config.models;
-    this._layers = config.layers;
-    this._neurons = config.neurons;
+    this.models = config.models;
+    this.layers = config.layers;
+    this.neurons = config.neurons;
 
-    this._onNothingSelect = config.onNothingSelect ?? (() => {});
-    this._onModelSelect = config.onModelSelect ?? ((_) => {});
-    this._onLayerSelect = config.onLayerSelect ?? ((_) => {});
-    this._onNeuronSelect = config.onNeuronSelect ?? ((_) => {});
+    this.onNothingSelect = config.onNothingSelect ?? (() => {});
+    this.onModelSelect = config.onModelSelect ?? ((_) => {});
+    this.onLayerSelect = config.onLayerSelect ?? ((_) => {});
+    this.onNeuronSelect = config.onNeuronSelect ?? ((_) => {});
 
-    this._handlePointerMoveBound = (e) => this.onPointerMove(e);
-    this._handlePointerDownBound = (e) => this.onPointerDown(e);
+    this.handlePointerMoveBound = (e) => this.onPointerMove(e);
+    this.handlePointerDownBound = (e) => this.onPointerDown(e);
 
-    this._element.addEventListener("pointermove", this._handlePointerMoveBound);
-    this._element.addEventListener("pointerdown", this._handlePointerDownBound);
+    this.element.addEventListener("pointermove", this.handlePointerMoveBound);
+    this.element.addEventListener("pointerdown", this.handlePointerDownBound);
   }
 
   // --- API pública útil si quieres forzar estados desde fuera --- //
   public getCurrentMode(): CameraMode {
-    return this._mode;
+    return this.mode;
   }
 
   public getFocusedModelId(): Record<string, any> | null {
-    if (this._focusedModel) {
-      return this._focusedModel.userData;
+    if (this.focusedModel) {
+      return this.focusedModel.userData;
     }
     return null;
   }
 
-  public getFocusedModel(): Panel | null {
-    return this._focusedModel;
+  public getFocusedModel(): Model | null {
+    return this.focusedModel;
+  }
+
+  public getFocusedLayer(): Layer | null {
+    return this.focusedLayer;
   }
 
   public getFocusedNeuron(): Neuron | null {
-    return this._focusedNeuron;
+    return this.focusedNeuron;
   }
 
-  // --- Eventos internos --- //
-  private onPointerMove(e: PointerEvent) {
-    this.updateMouse(e);
-    this.handleHover();
-  }
-
-  private onPointerDown(e: PointerEvent) {
-    this.updateMouse(e);
-    this.handleClick();
-  }
-
-  // --- Utilidades de picking --- //
-  private updateMouse(e: PointerEvent) {
-    const rect = this._element.getBoundingClientRect();
-    this._mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
-    this._mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
-  }
-
-  private getObjectsForCurrentMode(): (Panel | Neuron)[] {
-    if (this._mode === "overview") {
-      return this._models;
+  private getObjectsForCurrentMode(): (Model | Layer | Neuron)[] {
+    if (this.mode === "overview") {
+      return this.models;
     }
 
-    if (this._mode === "modelFocus") {
-      return this._layers;
+    if (this.mode === "modelFocus") {
+      // Cuando estamos en modelFocus, lo clicable son capas (panels)
+      return this.layers;
     }
 
-    if (this._mode === "layerFocus") {
+    if (this.mode === "layerFocus") {
       // fallback seguro
-      return this._neurons;
+      return this.neurons;
     }
 
-    if (this._mode === "neuronFocus") {
+    if (this.mode === "neuronFocus") {
       // fallback seguro
-      return this._layers;
+      return this.layers;
     }
 
-    return this._models;
+    return this.models;
   }
 
-  private intersectWith(objects: (Panel | Neuron)[]): THREE.Object3D | null {
-    this._raycaster.setFromCamera(this._mouse, this._camera);
-    const intersects = this._raycaster.intersectObjects(objects, true);
+  private intersectWith(
+    objects: (Model | Layer | Neuron)[],
+  ): THREE.Object3D | null {
+    this.raycaster.setFromCamera(this.mouse, this.rig.camera);
+    const intersects = this.raycaster.intersectObjects(objects, true);
 
     if (intersects.length === 0) return null;
 
@@ -139,151 +130,165 @@ export class InteractionManager {
 
   // --- Lógica de hover --- //
   private handleHover() {
-    const objects: (Panel | Neuron)[] = this.getObjectsForCurrentMode();
+    const objects: (Model | Layer | Neuron)[] = this.getObjectsForCurrentMode();
     const intersected: THREE.Object3D | null = this.intersectWith(objects);
 
-    // Solo nos interesa si lo que hay debajo del ratón es un Panel
-    // const newPanel =
-    //   intersected instanceof Panel ? (intersected as Panel) : null;
     const newPanel: Panel = intersected as Panel;
 
-    // Si no ha cambiado el panel "hovered", no hacemos nada
-    if (newPanel === this._hoveredPanel) {
-      return;
+    if (this.hovered && this.hovered !== newPanel) {
+      this.hovered.hoverOut();
+      this.hovered = null;
     }
 
-    // Quitamos el efecto del panel anterior
-    if (this._hoveredPanel) {
-      this._hoveredPanel.hoverOut();
-    }
-
-    // Actualizamos referencia
-    this._hoveredPanel = newPanel;
-
-    // Aplicamos efecto al nuevo panel (si hay)
-    if (this._hoveredPanel) {
-      this._hoveredPanel.hoverIn();
-      this._element.style.cursor = "pointer";
+    if (newPanel) {
+      this.hovered = newPanel;
+      this.hovered.hoverIn();
+      this.element.style.cursor = "pointer";
     } else {
-      this._element.style.cursor = "default";
+      this.element.style.cursor = "default";
     }
   }
 
   // --- Lógica de click --- //
   public setMode(mode: CameraMode, target: Panel | Neuron | null = null) {
-    function showPanel(panel: Panel, mode: CameraMode) {
-      panel.visible = mode === "overview";
-      panel.parent?.children
-        .filter((chld) => chld.type === "Group")
-        .forEach((chld) => {
-          chld.children
-            .filter((schld) => schld.name === "panel")
-            .forEach((schld) => {
-              (schld as Panel).show();
-            });
-        });
+    this.mode = mode;
+
+    // reset hover
+    if (this.hovered) {
+      this.hovered.hoverOut();
+      this.hovered = null;
     }
 
-    this._mode = mode;
+    // Ajustes de visibilidad según modo
     if (mode === "overview") {
-      if (this._focusedModel) showPanel(this._focusedModel, mode);
-      this._focusedModel = null;
-      this._focusedNeuron = null;
-      this._onNothingSelect();
-      this._models.forEach((m) => showPanel(m, mode));
-    } else if (mode === "modelFocus" && target) {
-      this._focusedModel = target as Panel;
-      if (this._focusedModel) {
-        showPanel(this._focusedModel, mode);
-        this._onModelSelect(target.userData as ModelInfo);
-      }
-      this._focusedNeuron = null;
-    } else if (mode === "layerFocus" && target) {
-      this._focusedModel = target as Panel;
-      if (this._focusedModel) {
-        showPanel(this._focusedModel, mode);
-        this._onLayerSelect(target.userData as LayerInfo);
-      }
-      this._focusedNeuron = null;
-    } else {
-      this._focusedNeuron = target?.parent?.children.filter(
-        (chld) => chld.name === "panel",
-      )[0] as Neuron;
-      if (this._focusedModel) {
-        showPanel(this._focusedModel, mode);
-        this._onNeuronSelect(target?.userData as NeuronInfo);
-      }
+      this.models.forEach((p) => showPanel(p, "overview"));
+      // this._layers.forEach((p) => (p.visible = false));
+      // this._neurons.forEach((n) => (n.visible = false));
+      this.focusedModel = null;
+      this.focusedNeuron = null;
+      return;
+    }
+
+    if (mode === "modelFocus") {
+      // target debe ser un Model (Panel)
+      const model = target as Panel;
+      this.focusedModel = model;
+
+      this.models.forEach((p) =>
+        showPanel(p, p === model ? "overview" : "modelFocus"),
+      );
+
+      // this._layers.forEach((l) => {
+      //   l.visible = l.parent === model.parent;
+      // });
+
+      // this._neurons.forEach((n) => (n.visible = false));
+      this.focusedNeuron = null;
+      return;
+    }
+
+    if (mode === "layerFocus") {
+      // target debe ser una Layer (Panel)
+      // const layer = target as Panel;
+      // this._layers.forEach((l) => (l.visible = l === layer));
+      // this._neurons.forEach((n) => (n.visible = true));
+      this.focusedNeuron = null;
+      return;
+    }
+
+    if (mode === "neuronFocus") {
+      // target debe ser un Neuron
+      const neuron = target as Neuron;
+      this.focusedNeuron = neuron;
+
+      // this._neurons.forEach((n) => (n.visible = n === neuron));
+      // this._layers.forEach((l) => (l.visible = false));
+      return;
     }
   }
 
-  private handleClick() {
-    const objects = this.getObjectsForCurrentMode();
-    let clicked: THREE.Object3D | null = this.intersectWith(objects);
+  private selectNothing() {
+    this.setMode("overview");
+    this.rig.focusOverview();
+    this.onNothingSelect();
+  }
 
-    // Click fuera en modo foco → overview
-    if (this._mode === "modelFocus" && this._focusedModel && !clicked) {
-      this.setMode("overview");
-      this._rig.focusOverview();
+  private selectModel(panel: Panel) {
+    this.setMode("modelFocus", panel);
+    this.rig.focusOnObject(panel, "modelFocus");
+    this.onModelSelect(panel.userData as ModelInfo);
+  }
+
+  private selectLayer(panel: Panel) {
+    this.setMode("layerFocus", panel);
+    this.rig.focusOnObject(panel, "layerFocus");
+    this.onLayerSelect(this.focusedModel?.userData as LayerInfo);
+  }
+
+  private selectNeuron(neuron: Neuron) {
+    this.setMode("neuronFocus", neuron);
+    this.rig.focusOnObject(neuron, "neuronFocus");
+    this.onNeuronSelect(neuron.userData as NeuronInfo);
+  }
+
+  // --- Eventos DOM --- //
+  private onPointerMove(e: PointerEvent) {
+    const rect = this.element.getBoundingClientRect();
+    this.mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+    this.mouse.y = -(((e.clientY - rect.top) / rect.height) * 2 - 1);
+
+    this.handleHover();
+  }
+
+  private onPointerDown(e: PointerEvent) {
+    const rect = this.element.getBoundingClientRect();
+    this.mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+    this.mouse.y = -(((e.clientY - rect.top) / rect.height) * 2 - 1);
+
+    const objects: (Panel | Neuron)[] = this.getObjectsForCurrentMode();
+    const clicked = this.intersectWith(objects);
+
+    if (!clicked) {
+      this.selectNothing();
       return;
     }
-    // Click modelo en modo overview → modelFocus
-    if (
-      (clicked && this._mode === "overview") ||
-      (!clicked && this._mode === "layerFocus")
-    ) {
-      if (!clicked) {
-        clicked = this._focusedModel?.parent?.parent?.children.filter(
-          (cld) => cld.name === "panel",
-        )[0] as THREE.Mesh;
-      }
-      const modelId: string | null = clicked.userData.modelId || null;
-      if (modelId) {
-        this._layers.forEach((l) => l.hide());
-        this.setMode("modelFocus", clicked as Panel);
-        this._rig.focusOnObject(clicked, "modelFocus");
-      }
+
+    // En overview solo model-panels
+    if (this.mode === "overview") {
+      this.selectModel(clicked as Panel);
       return;
     }
-    // Click neurona en modo modelFocus → layerFocus
-    // Click layer en modo neuronFocus -> layerFocus
-    if (
-      (clicked && this._mode === "modelFocus") ||
-      ((clicked?.name === "panel" || !clicked) && this._mode === "neuronFocus")
-    ) {
-      if (!clicked) {
-        clicked = this._focusedModel;
-      }
-      if (!clicked) return;
-      const info: NeuronInfo = clicked.userData as NeuronInfo;
-      if (info) {
-        this._layers.forEach((l) => l.hide());
-        this.setMode("layerFocus", clicked as Panel);
-        this._rig.focusOnObject(clicked, "layerFocus");
-      }
+
+    // En modelFocus clicamos layer-panels
+    if (this.mode === "modelFocus") {
+      this.selectLayer(clicked as Panel);
       return;
     }
-    // Click modelo en modo layerFocus → neuronFocus
-    if (clicked && this._mode === "layerFocus") {
-      const modelId: string | null = clicked.userData.modelId || null;
-      if (modelId) {
-        this._layers.forEach((l) => l.hide());
-        this.setMode("neuronFocus", clicked as Neuron);
-        this._rig.focusOnObject(clicked, "neuronFocus");
-      }
+
+    // En layerFocus clicamos neuronas
+    if (this.mode === "layerFocus") {
+      this.selectNeuron(clicked as Neuron);
+      return;
+    }
+
+    // En neuronFocus: click fuera vuelve a layerFocus (o lo que quieras)
+    if (this.mode === "neuronFocus") {
+      this.setMode("layerFocus");
+      this.rig.focusOnObject(clicked as THREE.Object3D, "layerFocus");
       return;
     }
   }
 
   // --- Limpieza --- //
   public dispose() {
-    this._element.removeEventListener(
+    this.element.removeEventListener(
       "pointermove",
-      this._handlePointerMoveBound,
+      this.handlePointerMoveBound,
     );
-    this._element.removeEventListener(
+    this.element.removeEventListener(
       "pointerdown",
-      this._handlePointerDownBound,
+      this.handlePointerDownBound,
     );
-    this._element.style.cursor = "default";
+    this.element.style.cursor = "default";
   }
 }

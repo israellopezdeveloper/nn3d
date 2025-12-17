@@ -2,23 +2,101 @@ import * as THREE from "three";
 import gsap from "gsap";
 import type { CameraMode } from "./types.ts";
 
+type CameraRigOptions = {
+  rootGroup: THREE.Group;
+  viewportWidth: number;
+  viewportHeight: number;
+  frustumSize?: number;
+  near?: number;
+  far?: number;
+  initialPosition?: THREE.Vector3 | { x: number; y: number; z: number };
+};
+
 export class CameraRig {
   public camera: THREE.OrthographicCamera;
 
-  private ZOOM_PERCENTAGE: number = 0.9;
+  private readonly ZOOM_PERCENTAGE: number = 0.9;
 
   private targetLookAt: THREE.Vector3;
   private rootGroup: THREE.Group;
 
   // Duraciones de las animaciones (en segundos)
-  private MOVE_DURATION: number = 0.6;
-  private ZOOM_DURATION: number = 0.6;
-  private TILT_DURATION: number = 0.6;
+  private readonly MOVE_DURATION: number = 0.6;
+  private readonly ZOOM_DURATION: number = 0.6;
+  private readonly TILT_DURATION: number = 0.6;
 
-  constructor(camera: THREE.OrthographicCamera, root: THREE.Group) {
-    this.camera = camera;
+  // Tamaño del frustum ortográfico base (alto). El ancho se deriva del aspect.
+  private frustumSize: number;
+
+  constructor(camera: THREE.OrthographicCamera, rootGroup: THREE.Group);
+  constructor(options: CameraRigOptions);
+  constructor(
+    cameraOrOptions: THREE.OrthographicCamera | CameraRigOptions,
+    rootGroup?: THREE.Group,
+  ) {
+    if (cameraOrOptions instanceof THREE.OrthographicCamera) {
+      if (!rootGroup) {
+        throw new Error(
+          "CameraRig: rootGroup is required when passing a camera.",
+        );
+      }
+      this.camera = cameraOrOptions;
+      this.rootGroup = rootGroup;
+      this.frustumSize = this.camera.top - this.camera.bottom;
+    } else {
+      const {
+        rootGroup: rg,
+        viewportWidth,
+        viewportHeight,
+        frustumSize = 10,
+        near = 0.1,
+        far = 1000,
+        initialPosition = { x: 0, y: 0, z: 10 },
+      } = cameraOrOptions;
+
+      this.rootGroup = rg;
+      this.frustumSize = frustumSize;
+
+      const aspect = Math.max(viewportWidth, 1) / Math.max(viewportHeight, 1);
+      this.camera = new THREE.OrthographicCamera(
+        (-frustumSize * aspect) / 2,
+        (frustumSize * aspect) / 2,
+        frustumSize / 2,
+        -frustumSize / 2,
+        near,
+        far,
+      );
+
+      if (initialPosition instanceof THREE.Vector3) {
+        this.camera.position.copy(initialPosition);
+      } else {
+        this.camera.position.set(
+          initialPosition.x,
+          initialPosition.y,
+          initialPosition.z,
+        );
+      }
+    }
+
     this.targetLookAt = new THREE.Vector3(0, 0, 0);
-    this.rootGroup = root;
+    this.camera.lookAt(this.targetLookAt);
+  }
+
+  /**
+   * Actualiza el frustum ortográfico en base al tamaño del viewport.
+   * Importante: el renderer sigue siendo responsable del setSize().
+   */
+  public resize(viewportWidth: number, viewportHeight: number) {
+    const w = Math.max(viewportWidth, 1);
+    const h = Math.max(viewportHeight, 1);
+    const aspect = w / h;
+
+    this.camera.left = (-this.frustumSize * aspect) / 2;
+    this.camera.right = (this.frustumSize * aspect) / 2;
+    this.camera.top = this.frustumSize / 2;
+    this.camera.bottom = -this.frustumSize / 2;
+
+    this.camera.updateProjectionMatrix();
   }
 
   public focusOverview(object?: THREE.Object3D) {
@@ -61,7 +139,7 @@ export class CameraRig {
 
     const newZoom = Math.min(zoomX, zoomY) * this.ZOOM_PERCENTAGE;
 
-    // this.setTilt(box, mode);
+    this.setTilt(box, mode);
 
     // Animar posición X/Y de la cámara hacia el centro de la caja
     gsap.to(this.camera.position, {
@@ -103,6 +181,7 @@ export class CameraRig {
       layerFocus: 50,
       neuronFocus: 60,
     };
+
     const targetRad = THREE.MathUtils.degToRad(tiltByMode[mode]);
 
     // Animamos la rotación en X del rootGroup para simular el tilt
@@ -117,6 +196,12 @@ export class CameraRig {
           target.getCenter(center);
           this.camera.lookAt(center);
         }
+      },
+      onComplete: () => {
+        if (!target) return;
+        const center = new THREE.Vector3();
+        target.getCenter(center);
+        this.camera.lookAt(center);
       },
     });
   }
