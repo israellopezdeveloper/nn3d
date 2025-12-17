@@ -85,7 +85,7 @@ jobs:
 
       - name: Install demo deps
         working-directory: ghp/demo
-        run: pnpm install
+        run: pnpm install --no-frozen-lockfile --ignore-workspace
 
       - name: SvelteKit sync
         working-directory: ghp/demo
