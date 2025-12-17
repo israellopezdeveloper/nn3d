@@ -1,4 +1,7 @@
+// Model.ts
 import * as THREE from "three";
+import gsap from "gsap";
+
 import type { ModelNode, LayerNode } from "$lib/types";
 import { Layer } from "$lib/objects/layer";
 import { Neuron } from "$lib/objects/neuron";
@@ -22,6 +25,16 @@ export class Model extends Hoverable {
   public readonly neuronFogColor: THREE.Color | number;
 
   private readonly lineColor: THREE.Color | number;
+
+  // lines animation
+  private linesMaterial: THREE.LineBasicMaterial | null = null;
+  private linesColorTween: gsap.core.Tween | null = null;
+
+  // Pulse tuning (feel free to tweak)
+  private readonly pulseDurationSec = 1.1;
+  private readonly pulseBoostToWhite = 0.15; // 0..1 (higher = brighter)
+  private readonly pulseClampMin = 0.12; // 0..1
+  private readonly pulseClampMax = 0.7; // 0..1
 
   declare userData: ModelNode;
 
@@ -99,6 +112,22 @@ export class Model extends Hoverable {
 
   getUserData(): ModelNode {
     return this.userData;
+  }
+
+  /**
+   * Call this when removing the model from the scene to prevent leaks.
+   */
+  public dispose(): void {
+    this.linesColorTween?.kill();
+    this.linesColorTween = null;
+
+    if (this.lines) {
+      this.lines.geometry.dispose();
+      this.lines.material.dispose();
+      this.lines = null;
+    }
+
+    this.linesMaterial = null;
   }
 
   // ----------------- private helpers -----------------
@@ -179,9 +208,66 @@ export class Model extends Hoverable {
       color: this.lineColor,
     });
 
+    // ✅ keep reference to animate color
+    this.linesMaterial = mat;
+
     const lines = new THREE.LineSegments(geom, mat);
     lines.name = `${this.name}:connections`;
 
+    // ✅ start pulse animation
+    this.startLinesPulseAnimation();
+
     return lines;
+  }
+
+  /**
+   * Pulse style:
+   * baseColor -> (complementaryColor boosted towards white) -> baseColor ...
+   * with clamp to avoid "too dark" or "too blown out" values.
+   */
+  private startLinesPulseAnimation(): void {
+    if (!this.linesMaterial) return;
+
+    // Prevent duplicated tweens if called again
+    this.linesColorTween?.kill();
+
+    // Base color (as linear 0..1 components)
+    const base = new THREE.Color(this.linesMaterial.color);
+
+    // Complementary (opposite)
+    const comp = new THREE.Color(
+      Math.min(base.r * 1.001, 1),
+      Math.min(base.g * 1.001, 1),
+      Math.min(base.b * 1.001, 1),
+    );
+
+    // Boost towards white for a nicer "pulse" (instead of harsh inverse)
+    const boosted = comp
+      .clone()
+      .lerp(new THREE.Color(1, 1, 1), this.pulseBoostToWhite);
+
+    // Clamp to keep it visually pleasant / consistent
+    const target = new THREE.Color(
+      this.clamp01(boosted.r, this.pulseClampMin, this.pulseClampMax),
+      this.clamp01(boosted.g, this.pulseClampMin, this.pulseClampMax),
+      this.clamp01(boosted.b, this.pulseClampMin, this.pulseClampMax),
+    );
+
+    // Animate material color r/g/b (0..1)
+    this.linesColorTween = gsap.to(this.linesMaterial.color, {
+      r: target.r,
+      g: target.g,
+      b: target.b,
+      duration: this.pulseDurationSec,
+      ease: "sine.inOut",
+      yoyo: true,
+      repeat: -1,
+    });
+  }
+
+  private clamp01(v: number, min: number, max: number): number {
+    // clamp + keep inside [0,1]
+    const vv = Math.min(1, Math.max(0, v));
+    return Math.min(max, Math.max(min, vv));
   }
 }
