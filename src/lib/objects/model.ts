@@ -1,8 +1,8 @@
 import * as THREE from "three";
-import type { ModelNode, LayerNode } from "./types.ts";
-import { Layer } from "./layer.ts";
-import { Neuron } from "./neuron.ts";
-import { Hoverable } from "./InteractiveObject.ts";
+import type { ModelNode, LayerNode } from "$lib/types";
+import { Layer } from "$lib/objects/layer";
+import { Neuron } from "$lib/objects/neuron";
+import { Hoverable } from "$lib/objects/InteractiveObject";
 
 export class Model extends Hoverable {
   public nnLayers: Layer[] = [];

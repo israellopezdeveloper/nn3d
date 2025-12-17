@@ -1,11 +1,11 @@
 import * as THREE from "three";
-import { CameraRig } from "./camera-rig.ts";
-import { PanelFactory, type PanelResult } from "./panel-factory.ts";
-import { InteractionManager } from "./interaction-manager.ts";
-import type { ModelNode, NN3DInterface } from "./types.ts";
-import type { Neuron } from "./neuron.ts";
-import type { Model } from "./model.ts";
-import type { Layer } from "./layer.ts";
+import { CameraRig } from "$lib/camera-rig";
+import { ModelFactory, type ModelResult } from "$lib/model-factory";
+import { InteractionManager } from "$lib/interaction-manager";
+import type { ModelNode, NN3DInterface } from "$lib/types";
+import type { Neuron } from "$lib/objects/neuron";
+import type { Model } from "$lib/objects/model";
+import type { Layer } from "$lib/objects/layer";
 
 export class SceneManager {
   private _container: HTMLElement;
@@ -18,7 +18,7 @@ export class SceneManager {
   private _rig: CameraRig;
 
   private _rootGroup: THREE.Group;
-  private _panelResults: PanelResult[] = [];
+  private _panelResults: ModelResult[] = [];
   private _panelWidths: number[] = [];
 
   private _models: Model[] = [];
@@ -66,8 +66,9 @@ export class SceneManager {
       rootGroup: this._rootGroup,
       viewportWidth: rect.width,
       viewportHeight: rect.height,
-      frustumSize: 10,
-      initialPosition: { x: 0, y: 0, z: 10 },
+      fov: 70,
+      near: 0.1,
+      far: 200,
     });
     this._rig.focusOverview(this._rootGroup);
 
@@ -144,10 +145,10 @@ export class SceneManager {
   }
 
   private buildModels(models: ModelNode[]) {
-    const panelFactory = new PanelFactory();
+    const panelFactory = new ModelFactory();
 
     models.forEach((model, i) => {
-      const panelResult: PanelResult = panelFactory.createNN(
+      const panelResult: ModelResult = panelFactory.createNN(
         model,
         i,
         models.length,
@@ -204,8 +205,6 @@ export class SceneManager {
   private animate = () => {
     this._animationId = requestAnimationFrame(this.animate);
 
-    // La animación de neuronas ya vive dentro de cada Neuron (GSAP),
-    // así que aquí solo actualizamos el rig y renderizamos.
     this._rig.update(performance.now());
     this._renderer.render(this._scene, this._rig.camera);
   };
@@ -216,8 +215,6 @@ export class SceneManager {
     window.removeEventListener("resize", this._handleResizeBound);
     this._interaction.dispose();
 
-    // MUY IMPORTANTE si Neuron usa GSAP:
-    // mata timelines/tweens propios para evitar memory leaks.
     for (const n of this._neurons) {
       (n as unknown as { dispose?: () => void }).dispose?.();
     }
@@ -249,6 +246,9 @@ export class SceneManager {
     if (!modelID) {
       this._interaction.setMode("overview");
       this._rig.focusOverview();
+      if (this._config.onNothingSelect) {
+        this._config.onNothingSelect();
+      }
       return;
     }
 
@@ -260,19 +260,23 @@ export class SceneManager {
 
       this._interaction.setMode("modelFocus", model);
       this._rig.focusOnObject(model, "modelFocus");
+      if (this._config.onModelSelect) {
+        this._config.onModelSelect(model.getUserData());
+      }
       return;
     }
 
     if (!neuronID) {
-      console.log("PASA - ", layerID, " - ", this._layers);
       const layer: Layer | undefined = this._layers.find(
         (l) => l.name === layerID,
       );
-      console.log("PASA - ", layer);
       if (!layer) return;
 
       this._interaction.setMode("layerFocus", layer);
       this._rig.focusOnObject(layer, "layerFocus");
+      if (this._config.onLayerSelect) {
+        this._config.onLayerSelect(layer.getUserData());
+      }
       return;
     }
 
@@ -285,5 +289,8 @@ export class SceneManager {
 
     this._interaction.setMode("neuronFocus", neuron);
     this._rig.focusOnObject(neuron, "neuronFocus");
+    if (this._config.onNeuronSelect) {
+      this._config.onNeuronSelect(neuron.getUserData());
+    }
   }
 }

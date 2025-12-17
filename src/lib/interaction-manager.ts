@@ -1,16 +1,16 @@
 import * as THREE from "three";
-import type { CameraRig } from "./camera-rig.ts";
-import { Neuron } from "./neuron.ts";
+import type { CameraRig } from "$lib/camera-rig";
+import { Neuron } from "$lib/objects/neuron";
 import type {
   CameraMode,
   InteractionConfig,
   LayerNode,
   ModelNode,
   NeuronNode,
-} from "./types.ts";
-import type { Model } from "./model.ts";
-import type { Layer } from "./layer.ts";
-import type { Hoverable } from "./InteractiveObject.ts";
+} from "$lib/types";
+import type { Model } from "$lib/objects/model";
+import type { Layer } from "$lib/objects/layer";
+import type { Hoverable } from "$lib/objects/InteractiveObject";
 
 export class InteractionManager {
   private rig: CameraRig;

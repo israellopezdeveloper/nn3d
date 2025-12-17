@@ -1,7 +1,7 @@
 import * as THREE from "three";
-import type { LayerNode } from "./types.ts";
-import { Neuron } from "./neuron.ts";
-import { Hoverable } from "./InteractiveObject.ts";
+import type { LayerNode } from "$lib/types";
+import { Neuron } from "$lib/objects/neuron";
+import { Hoverable } from "$lib/objects/InteractiveObject";
 
 export class Layer extends Hoverable {
   public nn_neurons: Neuron[] = [];
@@ -60,7 +60,7 @@ export class Layer extends Hoverable {
     this.highlight.receiveShadow = false;
   }
 
-  getUserData(): LayerNode | undefined {
+  getUserData(): LayerNode {
     return this.userData;
   }
 

@@ -41,9 +41,9 @@ export abstract class Hoverable extends THREE.Group {
 
     this.highlight.geometry.dispose();
     this.highlight.geometry = new THREE.BoxGeometry(
-      size.x * 1.15,
-      size.y * 1.15,
-      size.z * 1.25,
+      size.x * 1.05,
+      size.y * 1.05,
+      size.z * 1.05,
     );
 
     this.highlight.position.copy(this.worldToLocal(center.clone()));

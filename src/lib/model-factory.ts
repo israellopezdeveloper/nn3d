@@ -1,17 +1,17 @@
 import * as THREE from "three";
-import type { ModelNode, NN3DInterface } from "./types.ts";
-import { Model } from "./model.ts";
-import type { Layer } from "./layer.ts";
-import type { Neuron } from "./neuron.ts";
+import type { ModelNode, NN3DInterface } from "$lib/types";
+import { Model } from "$lib/objects/model";
+import type { Layer } from "$lib/objects/layer";
+import type { Neuron } from "$lib/objects/neuron";
 
-export type PanelResult = {
+export type ModelResult = {
   group: THREE.Group;
   model: Model;
   layers: Layer[];
   neurons: Neuron[];
 };
 
-export class PanelFactory {
+export class ModelFactory {
   constructor() {}
 
   public createNN(
@@ -20,7 +20,7 @@ export class PanelFactory {
     total: number,
     rotate: boolean = false,
     config: NN3DInterface,
-  ): PanelResult {
+  ): ModelResult {
     const neuronSpacing = config.neuronSpacing ?? 2.0;
     const layerSpacing = config.layerSpacing ?? 2.2;
 

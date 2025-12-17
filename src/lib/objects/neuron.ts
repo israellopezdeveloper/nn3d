@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import gsap from "gsap";
-import type { NeuronNode } from "./types.ts";
-import { Hoverable } from "./InteractiveObject.ts";
+import type { NeuronNode } from "$lib/types";
+import { Hoverable } from "$lib/objects/InteractiveObject";
 
 export class Neuron extends Hoverable {
   private core: THREE.Mesh;
@@ -97,7 +97,7 @@ export class Neuron extends Hoverable {
     this.startIdleAnimation();
   }
 
-  public getUserData(): NeuronNode | undefined {
+  public getUserData(): NeuronNode {
     return this.userData;
   }
 
@@ -137,45 +137,31 @@ export class Neuron extends Hoverable {
   // ----------------- private -----------------
 
   private startIdleAnimation(): void {
-    // Si reinicias, limpia
     this.idleTl?.kill();
 
-    // Timeline infinito
-    this.idleTl = gsap.timeline({ repeat: -1, yoyo: true });
+    const base = this.inner.position.clone();
 
-    // Movimiento "órbita" aproximado (3 ejes)
-    // Usamos duraciones distintas para que no sea repetitivo
-    this.idleTl.to(
-      this.inner.position,
-      {
-        x: 0.3,
-        duration: 1.2,
-        ease: "sine.inOut",
+    const state = { t: 0 }; // ángulo en radianes
+
+    this.idleTl = gsap.timeline({ repeat: -1 });
+
+    this.idleTl.to(state, {
+      t: Math.PI * 2,
+      duration: 6, // velocidad de órbita
+      ease: "none", // importante: velocidad constante
+      repeat: -1,
+      onUpdate: () => {
+        const r = 0.3; // radio
+
+        this.inner.position.set(
+          base.x + Math.cos(state.t * 2) * r,
+          base.y + Math.sin(state.t * 3) * r, // leve bobbing vertical opcional
+          base.z + Math.sin(state.t * 4) * r,
+        );
       },
-      0,
-    );
+    });
 
-    this.idleTl.to(
-      this.inner.position,
-      {
-        y: 0.3,
-        duration: 0.9,
-        ease: "sine.inOut",
-      },
-      0,
-    );
-
-    this.idleTl.to(
-      this.inner.position,
-      {
-        z: 0.3,
-        duration: 1.5,
-        ease: "sine.inOut",
-      },
-      0,
-    );
-
-    // Pequeño “breathing” del fog (sin hover)
+    // breathing del fog sincronizado pero independiente
     const fogMat = this.fogSphere.material as THREE.MeshBasicMaterial;
     this.idleTl.to(
       fogMat,
@@ -183,8 +169,8 @@ export class Neuron extends Hoverable {
         opacity: 0.08,
         duration: 1.0,
         ease: "sine.inOut",
-        // Importante: si está hover, el hover manda y este tween no debe pelear
-        // pero como usamos overwrite en hoverIn/out, se mantiene controlado.
+        repeat: -1,
+        yoyo: true,
       },
       0,
     );

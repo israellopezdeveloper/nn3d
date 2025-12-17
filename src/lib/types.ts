@@ -1,8 +1,8 @@
 import { Color } from "three";
-import type { CameraRig } from "./camera-rig.ts";
-import type { Neuron } from "./neuron.ts";
-import type { Model } from "./model.ts";
-import type { Layer } from "./layer.ts";
+import type { CameraRig } from "$lib/camera-rig";
+import type { Neuron } from "$lib/objects/neuron";
+import type { Model } from "$lib/objects/model";
+import type { Layer } from "$lib/objects/layer";
 
 export type InteractionConfig = {
   rig: CameraRig;
@@ -25,13 +25,11 @@ export type CameraMode =
 export type NeuronNode = {
   id: string;
   label: string;
-  type: string;
 };
 
 export type LayerNode = {
   id: string;
   label: string;
-  type: string;
   neurons: NeuronNode[];
 };
 
