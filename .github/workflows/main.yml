@@ -79,8 +79,7 @@ jobs:
         working-directory: ghp/demo
         env:
           VERSION: ${{ steps.meta.outputs.ver }}
-          # Cambia esto por el nombre real del paquete publicado en npm:
-          PKG_NAME: TU_PAQUETE_NPM
+          PKG_NAME: "@israellopezdeveloper/nn3d"
         run: |
           pnpm pkg set "dependencies.${PKG_NAME}=${VERSION}"
 
