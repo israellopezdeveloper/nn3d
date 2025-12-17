@@ -87,6 +87,10 @@ jobs:
         working-directory: ghp/demo
         run: pnpm install
 
+      - name: SvelteKit sync
+        working-directory: ghp/demo
+        run: pnpm exec svelte-kit sync
+
       - name: Build demo (static for GitHub Pages)
         working-directory: ghp/demo
         env:
