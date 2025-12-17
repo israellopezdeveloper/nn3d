@@ -1,34 +1,88 @@
 import * as THREE from "three";
 import gsap from "gsap";
-import type { CameraMode } from "./types.ts";
+import type { CameraMode } from "$lib/types";
+
+type CameraRigOptions = {
+  rootGroup: THREE.Group;
+  viewportWidth: number;
+  viewportHeight: number;
+
+  fov?: number;
+  near?: number;
+  far?: number;
+
+  initialPosition?: THREE.Vector3 | { x: number; y: number; z: number };
+};
 
 export class CameraRig {
-  public camera: THREE.OrthographicCamera;
+  public camera: THREE.PerspectiveCamera;
 
-  private ZOOM_PERCENTAGE: number = 0.9;
+  private readonly ZOOM_PERCENTAGE = 0.7;
 
   private targetLookAt: THREE.Vector3;
   private rootGroup: THREE.Group;
 
-  // Duraciones de las animaciones (en segundos)
-  private MOVE_DURATION: number = 0.6;
-  private ZOOM_DURATION: number = 0.6;
-  private TILT_DURATION: number = 0.6;
+  private readonly MOVE_DURATION = 0.6;
+  private readonly TILT_DURATION = 0.6;
 
-  constructor(camera: THREE.OrthographicCamera, root: THREE.Group) {
-    this.camera = camera;
+  constructor(camera: THREE.PerspectiveCamera, rootGroup: THREE.Group);
+  constructor(options: CameraRigOptions);
+  constructor(
+    cameraOrOptions: THREE.PerspectiveCamera | CameraRigOptions,
+    rootGroup?: THREE.Group,
+  ) {
+    if (cameraOrOptions instanceof THREE.PerspectiveCamera) {
+      if (!rootGroup) {
+        throw new Error(
+          "CameraRig: rootGroup is required when passing a camera.",
+        );
+      }
+      this.camera = cameraOrOptions;
+      this.rootGroup = rootGroup;
+    } else {
+      const {
+        rootGroup: rg,
+        viewportWidth,
+        viewportHeight,
+        fov = 50,
+        near = 0.1,
+        far = 2000,
+        initialPosition = { x: 0, y: 0, z: 10 },
+      } = cameraOrOptions;
+
+      this.rootGroup = rg;
+
+      const w = Math.max(viewportWidth, 1);
+      const h = Math.max(viewportHeight, 1);
+      const aspect = w / h;
+
+      this.camera = new THREE.PerspectiveCamera(fov, aspect, near, far);
+
+      if (initialPosition instanceof THREE.Vector3) {
+        this.camera.position.copy(initialPosition);
+      } else {
+        this.camera.position.set(
+          initialPosition.x,
+          initialPosition.y,
+          initialPosition.z,
+        );
+      }
+    }
+
     this.targetLookAt = new THREE.Vector3(0, 0, 0);
-    this.rootGroup = root;
+    this.camera.lookAt(this.targetLookAt);
+    this.camera.updateProjectionMatrix();
+  }
+
+  public resize(viewportWidth: number, viewportHeight: number) {
+    const w = Math.max(viewportWidth, 1);
+    const h = Math.max(viewportHeight, 1);
+    this.camera.aspect = w / h;
+    this.camera.updateProjectionMatrix();
   }
 
   public focusOverview(object?: THREE.Object3D) {
-    if (object) {
-      const box = new THREE.Box3().setFromObject(object);
-      this.zoomToBox(box, "overview");
-      return;
-    }
-
-    const box = new THREE.Box3().setFromObject(this.rootGroup);
+    const box = new THREE.Box3().setFromObject(object ?? this.rootGroup);
     this.zoomToBox(box, "overview");
   }
 
@@ -38,7 +92,6 @@ export class CameraRig {
   }
 
   public update(_deltaSeconds: number) {
-    // Mantener el lookAt al target interpolado
     this.camera.lookAt(this.targetLookAt);
   }
 
@@ -49,43 +102,42 @@ export class CameraRig {
     const size = new THREE.Vector3();
     box.getSize(size);
 
-    const eps = 0.00001;
+    const eps = 1e-6;
     size.x = Math.max(size.x, eps);
     size.y = Math.max(size.y, eps);
+    size.z = Math.max(size.z, eps);
 
-    const frustumWidth = this.camera.right - this.camera.left;
-    const frustumHeight = this.camera.top - this.camera.bottom;
+    // 1) Distancia para encuadrar (sin tilt del mundo)
+    const fovRad = THREE.MathUtils.degToRad(this.camera.fov);
+    const halfTan = Math.tan(fovRad / 2);
 
-    const zoomX = frustumWidth / size.x;
-    const zoomY = frustumHeight / size.y;
+    const fitHeightDistance = size.y / 2 / halfTan;
+    const fitWidthDistance = size.x / 2 / (halfTan * this.camera.aspect);
 
-    const newZoom = Math.min(zoomX, zoomY) * this.ZOOM_PERCENTAGE;
+    let distance = Math.max(fitHeightDistance, fitWidthDistance);
+    distance = distance / this.ZOOM_PERCENTAGE;
 
-    // this.setTilt(box, mode);
+    // 2) Tilt = pitch de cámara (rotación X)
+    const pitch = this.pitchRadForMode(mode);
 
-    // Animar posición X/Y de la cámara hacia el centro de la caja
+    // 3) Colocamos la cámara “detrás” del centro según el pitch.
+    const dirToCamera = new THREE.Vector3(
+      0,
+      -Math.sin(pitch),
+      Math.cos(pitch),
+    ).normalize();
+    const targetPos = center.clone().add(dirToCamera.multiplyScalar(distance));
+
+    // 4) Animaciones: posición + objetivo + pitch de cámara
     gsap.to(this.camera.position, {
-      x: center.x,
-      y: center.y,
+      x: targetPos.x,
+      y: targetPos.y,
+      z: targetPos.z,
       duration: this.MOVE_DURATION,
       ease: "power1.inOut",
       overwrite: "auto",
-      onUpdate: () => this.camera.lookAt(center),
     });
 
-    // Animar zoom de la cámara
-    gsap.to(this.camera, {
-      zoom: newZoom,
-      duration: this.ZOOM_DURATION,
-      ease: "power3.inOut",
-      overwrite: "auto",
-      onUpdate: () => {
-        this.camera.updateProjectionMatrix();
-        this.camera.lookAt(center);
-      },
-    });
-
-    // Animar también el punto al que mira (lookAt) para evitar saltos bruscos
     gsap.to(this.targetLookAt, {
       x: center.x,
       y: center.y,
@@ -94,30 +146,22 @@ export class CameraRig {
       ease: "power1.inOut",
       overwrite: "auto",
     });
-  }
 
-  private setTilt(target: THREE.Box3 | null, mode: CameraMode) {
-    const tiltByMode: Record<CameraMode, number> = {
-      overview: 0,
-      modelFocus: 30,
-      layerFocus: 50,
-      neuronFocus: 60,
-    };
-    const targetRad = THREE.MathUtils.degToRad(tiltByMode[mode]);
-
-    // Animamos la rotación en X del rootGroup para simular el tilt
-    gsap.to(this.rootGroup.rotation, {
-      x: targetRad,
+    gsap.to(this.camera.rotation, {
+      x: pitch,
       duration: this.TILT_DURATION,
       ease: "power1.inOut",
       overwrite: "auto",
-      onUpdate: () => {
-        if (target) {
-          const center = new THREE.Vector3();
-          target.getCenter(center);
-          this.camera.lookAt(center);
-        }
-      },
     });
+  }
+
+  private pitchRadForMode(mode: CameraMode): number {
+    const pitchByMode: Record<CameraMode, number> = {
+      overview: 0,
+      modelFocus: -THREE.MathUtils.degToRad(-30),
+      layerFocus: -THREE.MathUtils.degToRad(-50),
+      neuronFocus: -THREE.MathUtils.degToRad(-60),
+    };
+    return pitchByMode[mode];
   }
 }
