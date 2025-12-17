@@ -2,9 +2,9 @@ import * as THREE from "three";
 import type { ModelNode, LayerNode } from "./types.ts";
 import { Layer } from "./layer.ts";
 import { Neuron } from "./neuron.ts";
+import { Hoverable } from "./InteractiveObject.ts";
 
-export class Model extends THREE.Group {
-  public highlight: THREE.Mesh<THREE.BoxGeometry, THREE.MeshBasicMaterial>;
+export class Model extends Hoverable {
   public nnLayers: Layer[] = [];
   public nnNeurons: Neuron[] = [];
 
@@ -23,7 +23,7 @@ export class Model extends THREE.Group {
 
   private readonly lineColor: THREE.Color | number;
 
-  declare userData: { node?: ModelNode } & THREE.Object3D["userData"];
+  declare userData: ModelNode;
 
   constructor(
     node: ModelNode,
@@ -33,11 +33,12 @@ export class Model extends THREE.Group {
     neuronInColor: THREE.Color | number = 0x66ccff,
     neuronFogColor: THREE.Color | number = 0x0088ff,
     lineColor: THREE.Color | number = 0x6ae3ff,
+    highlightColor: THREE.Color | number = 0x00aaff,
   ) {
-    super();
+    super(highlightColor);
 
     this.name = node.id;
-    this.userData.node = node;
+    this.userData = node;
 
     this.neuronSpacing = neuronSpacing;
     this.layerSpacing = layerSpacing;
@@ -49,7 +50,6 @@ export class Model extends THREE.Group {
     this.lineColor = lineColor;
 
     // Highlight
-    this.highlight = this.createHighlightMesh();
     this.add(this.highlight);
 
     const layerNodes = node.layers ?? [];
@@ -97,30 +97,11 @@ export class Model extends THREE.Group {
     this.highlight.receiveShadow = false;
   }
 
-  getUserData(): ModelNode | undefined {
-    return this.userData.node;
+  getUserData(): ModelNode {
+    return this.userData;
   }
 
   // ----------------- private helpers -----------------
-
-  private createHighlightMesh(): THREE.Mesh<
-    THREE.BoxGeometry,
-    THREE.MeshBasicMaterial
-  > {
-    const geom = new THREE.BoxGeometry(1, 1, 1);
-    const mat = new THREE.MeshBasicMaterial({
-      transparent: true,
-      opacity: 0.1,
-      depthWrite: false,
-    });
-
-    const mesh = new THREE.Mesh(geom, mat);
-    mesh.name = `${this.name}:highlight`;
-    mesh.visible = false;
-    mesh.castShadow = false;
-    mesh.receiveShadow = false;
-    return mesh;
-  }
 
   private computeMaxNeurons(layerNodes: LayerNode[]): number {
     let max = 1;
@@ -130,9 +111,6 @@ export class Model extends THREE.Group {
     return Math.max(1, max);
   }
 
-  /**
-   * Apila capas una debajo de otra (Y decreciente).
-   */
   private layoutLayersStacked(): void {
     const n = this.nnLayers.length;
     if (n === 0) return;
@@ -146,10 +124,6 @@ export class Model extends THREE.Group {
     }
   }
 
-  /**
-   * Conecta todas las neuronas de una capa con todas las de la capa siguiente.
-   * Devuelve LineSegments (pares de puntos).
-   */
   private buildAllToAllConnections(
     layers: Layer[],
   ): THREE.LineSegments<THREE.BufferGeometry, THREE.LineBasicMaterial> {
@@ -209,30 +183,5 @@ export class Model extends THREE.Group {
     lines.name = `${this.name}:connections`;
 
     return lines;
-  }
-
-  private fitHighlightToContent(): void {
-    const prev = this.highlight.visible;
-    this.highlight.visible = false;
-
-    const box = new THREE.Box3().setFromObject(this);
-    const size = new THREE.Vector3();
-    const center = new THREE.Vector3();
-    box.getSize(size);
-    box.getCenter(center);
-
-    size.x = Math.max(size.x, 0.6);
-    size.y = Math.max(size.y, 0.6);
-    size.z = Math.max(size.z, 0.2);
-
-    this.highlight.geometry.dispose();
-    this.highlight.geometry = new THREE.BoxGeometry(
-      size.x * 1.15,
-      size.y * 1.15,
-      size.z * 1.25,
-    );
-    this.highlight.position.copy(this.worldToLocal(center.clone()));
-
-    this.highlight.visible = prev;
   }
 }

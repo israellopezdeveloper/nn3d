@@ -1,8 +1,9 @@
 import * as THREE from "three";
 import gsap from "gsap";
 import type { NeuronNode } from "./types.ts";
+import { Hoverable } from "./InteractiveObject.ts";
 
-export class Neuron extends THREE.Group {
+export class Neuron extends Hoverable {
   private core: THREE.Mesh;
   private fogSphere: THREE.Mesh;
   private inner: THREE.Mesh;
@@ -13,18 +14,19 @@ export class Neuron extends THREE.Group {
 
   private idleTl: gsap.core.Timeline | null = null;
 
-  declare userData: { node?: NeuronNode } & THREE.Object3D["userData"];
+  declare userData: NeuronNode;
 
   constructor(
     node: NeuronNode,
     neuronOutColor: THREE.Color | number = 0x0033ff,
     neuronInColor: THREE.Color | number = 0x66ccff,
     neuronFogColor: THREE.Color | number = 0x0088ff,
+    highlightColor: THREE.Color | number = 0x00aaff,
   ) {
-    super();
+    super(highlightColor);
 
-    this.name = `Neuron:${node.id}`;
-    this.userData.node = node;
+    this.name = node.id;
+    this.userData = node;
 
     this.outColor =
       neuronOutColor instanceof THREE.Color
@@ -96,15 +98,10 @@ export class Neuron extends THREE.Group {
   }
 
   public getUserData(): NeuronNode | undefined {
-    return this.userData.node;
+    return this.userData;
   }
 
-  /** Para raycasting */
-  public getMesh(): THREE.Mesh {
-    return this.fogSphere;
-  }
-
-  public hoverIn(): void {
+  public onHoverIn(): void {
     const fogMat = this.fogSphere.material as THREE.MeshBasicMaterial;
     gsap.to(fogMat, {
       opacity: 0.14,
@@ -114,7 +111,7 @@ export class Neuron extends THREE.Group {
     });
   }
 
-  public hoverOut(): void {
+  public onHoverOut(): void {
     const fogMat = this.fogSphere.material as THREE.MeshBasicMaterial;
     gsap.to(fogMat, {
       opacity: 0.06,

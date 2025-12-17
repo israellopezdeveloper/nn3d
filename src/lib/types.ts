@@ -11,9 +11,9 @@ export type InteractionConfig = {
   layers: Layer[];
   neurons: Neuron[];
   onNothingSelect?: () => void;
-  onModelSelect?: (info: ModelInfo) => void;
-  onLayerSelect?: (info: LayerInfo) => void;
-  onNeuronSelect?: (info: NeuronInfo) => void;
+  onModelSelect?: (info: ModelNode) => void;
+  onLayerSelect?: (info: LayerNode) => void;
+  onNeuronSelect?: (info: NeuronNode) => void;
 };
 
 export type CameraMode =
@@ -21,19 +21,6 @@ export type CameraMode =
   | "modelFocus"
   | "layerFocus"
   | "neuronFocus";
-
-export type NeuronInfo = { modelId: string; layerId: string; neuronId: string };
-
-export type ModelInfo = {
-  modelId: string;
-  layers: LayerNode[];
-};
-
-export type LayerInfo = {
-  modelId: string;
-  layerId: string;
-  neurons: NeuronNode[];
-};
 
 export type NeuronNode = {
   id: string;
@@ -66,13 +53,16 @@ export type NN3DInterface = {
   // Color de líneas
   lineColor?: Color | number;
 
+  // Color highlight
+  highlightColor?: Color | number;
+
   // Layout / spacing
   neuronSpacing?: number;
   layerSpacing?: number;
 
   // callbacks opcionales desde el padre
   onNothingSelect?: () => void;
-  onModelSelect?: (info: ModelInfo) => void;
-  onLayerSelect?: (info: LayerInfo) => void;
-  onNeuronSelect?: (info: NeuronInfo) => void;
+  onModelSelect?: (info: ModelNode) => void;
+  onLayerSelect?: (info: LayerNode) => void;
+  onNeuronSelect?: (info: NeuronNode) => void;
 };

@@ -192,9 +192,7 @@ export class SceneManager {
     this._rig.resize(rect.width, rect.height);
     this._renderer.setSize(rect.width, rect.height);
 
-    // Re-enfocar (mantener el estado actual)
-    const focused =
-      this._interaction.getFocusedModel() as unknown as THREE.Object3D | null;
+    const focused = this._interaction.getFocused();
 
     if (this._interaction.getCurrentMode() === "overview") {
       this._rig.focusOverview();
@@ -244,68 +242,48 @@ export class SceneManager {
   }
 
   public goto(
-    model: "jobs" | "education" | null = null,
-    layer: string | null = null,
-    neuron: string | null = null,
+    modelID: string | null = null,
+    layerID: string | null = null,
+    neuronID: string | null = null,
   ) {
-    if (!model) {
+    if (!modelID) {
       this._interaction.setMode("overview");
       this._rig.focusOverview();
       return;
     }
 
-    if (!layer) {
-      const panel: Panel | undefined = this._models.find(
-        (p) => p.parent?.name === model,
+    if (!layerID) {
+      const model: Model | undefined = this._models.find(
+        (m) => m.name === modelID,
       );
-      if (!panel) return;
+      if (!model) return;
 
-      this._interaction.setMode("modelFocus", panel);
-      this._rig.focusOnObject(panel, "modelFocus");
+      this._interaction.setMode("modelFocus", model);
+      this._rig.focusOnObject(model, "modelFocus");
       return;
     }
 
-    if (!neuron) {
-      const panel: Panel | undefined = this._layers.find(
-        (p) => p.parent?.name === layer,
+    if (!neuronID) {
+      console.log("PASA - ", layerID, " - ", this._layers);
+      const layer: Layer | undefined = this._layers.find(
+        (l) => l.name === layerID,
       );
-      if (!panel) return;
+      console.log("PASA - ", layer);
+      if (!layer) return;
 
-      this._interaction.setMode("layerFocus", panel);
-      this._rig.focusOnObject(panel, "layerFocus");
+      this._interaction.setMode("layerFocus", layer);
+      this._rig.focusOnObject(layer, "layerFocus");
       return;
     }
 
     // Neuron focus
-    const found: Neuron | undefined = this._neurons.find((n) => {
-      // Soporte userData antiguo:
-      const ud: any = (n as any).userData;
-
-      const oldOk =
-        ud?.modelId === model &&
-        ud?.layerId === layer &&
-        ud?.neuronId === neuron;
-
-      // Soporte userData nuevo (Neuron guarda node):
-      // - node.id == neuron
-      // - layer/model pueden venir en campos extra o vía parent names
-      const nodeOk = ud?.node?.id === neuron;
-
-      const parentLayerOk = n.parent?.name === layer || ud?.layerId === layer;
-      const parentModelOk =
-        n.parent?.parent?.name === model || ud?.modelId === model;
-
-      const newOk = nodeOk && parentLayerOk && parentModelOk;
-
-      return oldOk || newOk;
-    });
-
-    if (!found) return;
-
-    this._interaction.setMode(
-      "neuronFocus",
-      found as unknown as THREE.Object3D,
+    const neuron: Neuron | undefined = this._neurons.find(
+      (n) => n.name === neuronID,
     );
-    this._rig.focusOnObject(found as unknown as THREE.Object3D, "neuronFocus");
+
+    if (!neuron) return;
+
+    this._interaction.setMode("neuronFocus", neuron);
+    this._rig.focusOnObject(neuron, "neuronFocus");
   }
 }

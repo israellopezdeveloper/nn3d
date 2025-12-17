@@ -21,7 +21,7 @@ export class PanelFactory {
     rotate: boolean = false,
     config: NN3DInterface,
   ): PanelResult {
-    const neuronSpacing = config.neuronSpacing ?? 1.0;
+    const neuronSpacing = config.neuronSpacing ?? 2.0;
     const layerSpacing = config.layerSpacing ?? 2.2;
 
     const neuronOutColor = config.neuronOutColor ?? 0x0033ff;

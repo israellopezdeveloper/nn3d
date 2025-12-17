@@ -2,9 +2,9 @@
   import { onMount, onDestroy } from "svelte";
   import { SceneManager } from "./scene-manager.ts";
   import type {
-    ModelInfo,
-    LayerInfo,
-    NeuronInfo,
+    ModelNode,
+    LayerNode,
+    NeuronNode,
     NN3DInterface,
   } from "./types.ts";
 
@@ -12,14 +12,17 @@
   let {
     models,
     background,
+    neuronOutColor,
+    neuronInColor,
+    neuronFogColor,
+    highlightColor,
+    lineColor,
+    neuronSpacing,
+    layerSpacing,
     onNothingSelect,
     onModelSelect,
     onLayerSelect,
     onNeuronSelect,
-    neuronOutColor,
-    neuronInColor,
-    neuronFogColor,
-    lineColor,
   }: NN3DInterface = $props();
 
   let container: HTMLDivElement;
@@ -30,15 +33,18 @@
 
     manager = new SceneManager(container, {
       models,
-      onNothingSelect: () => onNothingSelect?.(),
-      onModelSelect: (info: ModelInfo) => onModelSelect?.(info),
-      onLayerSelect: (info: LayerInfo) => onLayerSelect?.(info),
-      onNeuronSelect: (info: NeuronInfo) => onNeuronSelect?.(info),
+      background: background,
       neuronOutColor: neuronOutColor ?? 0x0033ff,
       neuronInColor: neuronInColor ?? 0x66ccff,
       neuronFogColor: neuronFogColor ?? 0x0088ff,
+      highlightColor: highlightColor ?? 0x00aaff,
       lineColor: lineColor ?? 0x6ae3ff,
-      background: background,
+      neuronSpacing: neuronSpacing ?? 1.8,
+      layerSpacing: layerSpacing ?? 2.5,
+      onNothingSelect: () => onNothingSelect?.(),
+      onModelSelect: (info: ModelNode) => onModelSelect?.(info),
+      onLayerSelect: (info: LayerNode) => onLayerSelect?.(info),
+      onNeuronSelect: (info: NeuronNode) => onNeuronSelect?.(info),
     });
   });
 
