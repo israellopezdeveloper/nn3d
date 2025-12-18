@@ -32,8 +32,6 @@ jobs:
       - name: Build
         run: npm run build
 
-      # 🔻 Vite/Svelte: dist
-      # 🔻 SvelteKit static: suele ser build (según adapter)
       - name: Deploy to gh-pages
         uses: peaceiris/actions-gh-pages@v4
         with:
