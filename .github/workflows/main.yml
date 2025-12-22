@@ -5,6 +5,10 @@ on:
     tags:
       - "v*.*.*"
 
+permissions:
+  id-token: write
+  contents: read
+
 jobs:
   publish-npm:
     name: Generate and push images
@@ -38,6 +42,4 @@ jobs:
       run: pnpm prepack
 
     - name: Publish
-      env:
-        NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
       run: npm publish --access public
