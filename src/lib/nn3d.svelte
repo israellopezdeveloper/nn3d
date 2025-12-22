@@ -53,7 +53,7 @@
   });
 
   export function goto(
-    model: "jobs" | "education" | null = null,
+    model: string | null = null,
     layer: string | null = null,
     neuron: string | null = null,
   ) {
