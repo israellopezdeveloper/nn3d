@@ -43,8 +43,10 @@
       layerSpacing: layerSpacing ?? 2.5,
       onNothingSelect: () => onNothingSelect?.(),
       onModelSelect: (info: ModelNode) => onModelSelect?.(info),
-      onLayerSelect: (info: LayerNode) => onLayerSelect?.(info),
-      onNeuronSelect: (info: NeuronNode) => onNeuronSelect?.(info),
+      onLayerSelect: (modelId: string, info: LayerNode) =>
+        onLayerSelect?.(modelId, info),
+      onNeuronSelect: (modelId: string, layerId: string, info: NeuronNode) =>
+        onNeuronSelect?.(modelId, layerId, info),
     });
   });
 

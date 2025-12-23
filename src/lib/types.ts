@@ -12,8 +12,8 @@ export type InteractionConfig = {
   neurons: Neuron[];
   onNothingSelect?: () => void;
   onModelSelect?: (info: ModelNode) => void;
-  onLayerSelect?: (info: LayerNode) => void;
-  onNeuronSelect?: (info: NeuronNode) => void;
+  onLayerSelect?: (modelId: string, info: LayerNode) => void;
+  onNeuronSelect?: (modelId: string, layerId: string, info: NeuronNode) => void;
 };
 
 export type CameraMode =
@@ -61,6 +61,6 @@ export type NN3DInterface = {
   // callbacks opcionales desde el padre
   onNothingSelect?: () => void;
   onModelSelect?: (info: ModelNode) => void;
-  onLayerSelect?: (info: LayerNode) => void;
-  onNeuronSelect?: (info: NeuronNode) => void;
+  onLayerSelect?: (modelId: string, info: LayerNode) => void;
+  onNeuronSelect?: (modelId: string, layerId: string, info: NeuronNode) => void;
 };

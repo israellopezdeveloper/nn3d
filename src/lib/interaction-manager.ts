@@ -25,8 +25,12 @@ export class InteractionManager {
 
   private onNothingSelect: () => void;
   private onModelSelect: (info: ModelNode) => void;
-  private onLayerSelect: (info: LayerNode) => void;
-  private onNeuronSelect: (info: NeuronNode) => void;
+  private onLayerSelect: (modelId: string, info: LayerNode) => void;
+  private onNeuronSelect: (
+    modelId: string,
+    layerId: string,
+    info: NeuronNode,
+  ) => void;
 
   private mode: CameraMode = "overview";
   private focused: Model | Layer | Neuron | null = null;
@@ -46,8 +50,10 @@ export class InteractionManager {
 
     this.onNothingSelect = config.onNothingSelect ?? (() => {});
     this.onModelSelect = config.onModelSelect ?? ((_) => {});
-    this.onLayerSelect = config.onLayerSelect ?? ((_) => {});
-    this.onNeuronSelect = config.onNeuronSelect ?? ((_) => {});
+    this.onLayerSelect =
+      config.onLayerSelect ?? ((__: string, _: LayerNode) => {});
+    this.onNeuronSelect =
+      config.onNeuronSelect ?? ((___: string, __: string, _: NeuronNode) => {});
 
     this.handlePointerMoveBound = (e) => this.onPointerMove(e);
     this.handlePointerDownBound = (e) => this.onPointerDown(e);
@@ -163,13 +169,16 @@ export class InteractionManager {
   private selectLayer(layer: Layer) {
     this.setMode("layerFocus", layer);
     this.rig.focusOnObject(layer, "layerFocus");
-    this.onLayerSelect(layer.userData as LayerNode);
+    const model: Model | null = layer.parent as Model;
+    this.onLayerSelect(model.name, layer.userData as LayerNode);
   }
 
   private selectNeuron(neuron: Neuron) {
     this.setMode("neuronFocus", neuron);
     this.rig.focusOnObject(neuron, "neuronFocus");
-    this.onNeuronSelect(neuron.userData as NeuronNode);
+    const layer: Layer | null = neuron.parent as Layer;
+    const model: Model | null = layer.parent as Model;
+    this.onNeuronSelect(model.name, layer.name, neuron.userData as NeuronNode);
   }
 
   // --- Eventos DOM --- //
