@@ -273,9 +273,10 @@ export class SceneManager {
       if (!layer) return;
 
       this._interaction.setMode("layerFocus", layer);
+      const model: Model = layer.parent as Model;
       this._rig.focusOnObject(layer, "layerFocus");
       if (this._config.onLayerSelect) {
-        this._config.onLayerSelect(layer.getUserData());
+        this._config.onLayerSelect(model.name, layer.getUserData());
       }
       return;
     }
@@ -289,8 +290,10 @@ export class SceneManager {
 
     this._interaction.setMode("neuronFocus", neuron);
     this._rig.focusOnObject(neuron, "neuronFocus");
+    const layer: Layer = neuron.parent as Layer;
+    const model: Model = layer.parent as Model;
     if (this._config.onNeuronSelect) {
-      this._config.onNeuronSelect(neuron.getUserData());
+      this._config.onNeuronSelect(model.name, layer.name, neuron.getUserData());
     }
   }
 }

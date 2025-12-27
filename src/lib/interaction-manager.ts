@@ -223,8 +223,7 @@ export class InteractionManager {
 
     // En neuronFocus: click fuera vuelve a layerFocus
     if (this.mode === "neuronFocus") {
-      this.setMode("layerFocus");
-      this.rig.focusOnObject(clicked as THREE.Object3D, "layerFocus");
+      this.selectLayer(clicked as Layer);
       return;
     }
   }
